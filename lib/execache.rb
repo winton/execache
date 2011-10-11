@@ -65,7 +65,9 @@ class Execache
               hash[cmd_type] = []
 
               if cmd_options['cmd']
-                separators = options[cmd_type]['separators']
+                separators = options[cmd_type]['separators'] || {}
+                separators['group'] ||= "[END]"
+                separators['result'] ||= "\n"
                 output = `#{cmd_options['cmd']}`
                 output = output.split(separators['group'] + separators['result'])
                 output = output.collect { |r| r.split(separators['result']) }
