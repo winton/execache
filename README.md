@@ -1,36 +1,75 @@
 Execache
-===========
+========
 
-A gem template for new projects.
+Run commands in parallel and cache the output. Redis queues jobs and stores the result.
 
 Requirements
 ------------
 
 <pre>
-gem install stencil
+gem install execache
 </pre>
 
-Setup the template
-------------------
+How Your Binaries Should Behave
+-------------------------------
 
-You only have to do this once.
+Execache assumes that the script or binary you are executing has multiple results and sometimes multiple groups of results.
 
-<pre>
-git clone git@github.com:winton/execache.git
-cd execache
-stencil
-</pre>
+Example output:
 
-Setup a new project
--------------------
+    $ bin/some/binary preliminary_arg arg1a arg1b arg2a arg2b
+    $ arg1_result_1
+    $ arg1_result_2
+    $ [END]
+    $ arg2_result_1
+    $ arg2_result_2
 
-Do this for every new project.
+Your binary may take zero or more preliminary arguments (e.g. `preliminary_arg`), followed by argument "groups" that dictate output (e.g. `arg1a arg1b`).
 
-<pre>
-mkdir my_project
-git init
-stencil execache
-rake rename
-</pre>
+Configure
+---------
 
-The last command does a find-replace (gem\_template -> my\_project) on files and filenames.
+Given the above example, our `execache.yml` looks like this:
+
+    redis: localhost:6379/0
+    some_binary:
+      command: '/bin/some/binary'
+      separators:
+        result: "\n"
+        group: "[END]"
+
+Start the Server
+----------------
+
+    $ execache /path/to/execache.yml
+
+Execute Commands
+----------------
+
+    require 'rubygems'
+    require 'execache'
+
+    client = Execache::Client.new("localhost:6379/0")
+    
+    results = client.exec(
+      :some_binary => {
+        :args => 'preliminary_arg',
+        :groups => [
+          {
+            :args => 'arg1a arg1b',
+            :ttl => 60
+          },
+          {
+            :args => 'arg2a arg2b',
+            :ttl => 60
+          }
+        ]
+      }
+    )
+
+    results == {
+      :some_binary => [
+        [ 'arg1_result_1', 'arg1_result_2' ],
+        [ 'arg2_result_1', 'arg2_result_2' ]
+      ]
+    }

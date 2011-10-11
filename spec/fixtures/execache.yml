@@ -1,0 +1,6 @@
+redis: localhost:6379/0
+some_binary:
+  command: 'ruby spec/fixtures/fixture.rb'
+  separators:
+    result: "\n"
+    group: "[END]"
