@@ -1,6 +1,8 @@
 class Execache
   class Client
 
+    attr_reader :redis_1, :redis_2
+
     def initialize(redis_url)
       @redis_1 = Redis.connect(:url => "redis://#{redis_url}")
       @redis_2 = Redis.connect(:url => "redis://#{redis_url}")

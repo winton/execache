@@ -26,7 +26,7 @@ class Execache
       while true
         request = redis.lpop('execache:request')
         if request
-          #Thread.new do
+          Thread.new do
             request = Yajl::Parser.parse(request)
             channel = request.delete('channel')
             commands = []
@@ -93,7 +93,7 @@ class Execache
               "execache:response:#{channel}",
               Yajl::Encoder.encode(response)
             )
-          #end
+          end
         end
         sleep(1.0 / 1000.0)
       end
