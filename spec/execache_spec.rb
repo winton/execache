@@ -2,21 +2,23 @@ require 'spec_helper'
 
 describe Execache do
 
-  def client_exec
+  def client_exec(options={})
     @client.exec(
-      :some_binary => {
-        :args => 'preliminary_arg',
-        :groups => [
-          {
-            :args => 'arg1a arg1b',
-            :ttl => 60
-          },
-          {
-            :args => 'arg2a arg2b',
-            :ttl => 60
-          }
-        ]
-      }
+      {
+        :some_binary => {
+          :args => 'preliminary_arg',
+          :groups => [
+            {
+              :args => 'arg1a arg1b',
+              :ttl => 60
+            },
+            {
+              :args => 'arg2a arg2b',
+              :ttl => 60
+            }
+          ]
+        }
+      }.merge(options)
     )
   end
 
@@ -117,6 +119,19 @@ describe Execache do
       "some_binary" => [
         ["cached!"],
         ["cached!"]
+      ]
+    }
+  end
+
+  it "should respect wait option" do
+    @client.redis_1.keys("execache:cache:*").each do |key|
+      @client.redis_1.del(key)
+    end
+    client_exec(:wait => false).should == false
+    client_exec.should == {
+      "some_binary" => [
+        ["arg1_result_1", "arg1_result_2"],
+        ["arg2_result_1", "arg2_result_2"]
       ]
     }
   end

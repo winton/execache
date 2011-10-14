@@ -26,10 +26,11 @@ class Execache
       while true
         request = redis.lpop('execache:request')
         if request
-          Thread.new do
+          Timeout.timeout(60) do
             request = Yajl::Parser.parse(request)
             channel = request.delete('channel')
             commands = []
+            pending = false
 
             request.each do |cmd_type, cmd_options|
               # Command with preliminary args
@@ -46,11 +47,14 @@ class Execache
                 group['cache_key'] = cache_key = "execache:cache:#{cache_key}"
                 cache = redis.get(cache_key)
                 
-                if cache
+                if cache && cache == '[PENDING]'
+                  pending = true
+                elsif cache
                   group['result'] = Yajl::Parser.parse(cache)
                 else
+                  pending = true
+                  redis.set(cache_key, '[PENDING]')
                   command << group['args']
-                  nil
                 end
               end
               
@@ -60,40 +64,49 @@ class Execache
               end
             end
 
-            # Build response
-            response = request.inject({}) do |hash, (cmd_type, cmd_options)|
-              hash[cmd_type] = []
+            if pending
+              # Execute command in thread, cache results
+              Thread.new do
+                Timeout.timeout(60) do
+                  request.each do |cmd_type, cmd_options|
+                    if cmd_options['cmd']
+                      separators = options[cmd_type]['separators'] || {}
+                      separators['group'] ||= "[END]"
+                      separators['result'] ||= "\n"
+                      output = `#{cmd_options['cmd']}`
+                      output = output.split(separators['group'] + separators['result'])
+                      output = output.collect { |r| r.split(separators['result']) }
+                    end
 
-              if cmd_options['cmd']
-                separators = options[cmd_type]['separators'] || {}
-                separators['group'] ||= "[END]"
-                separators['result'] ||= "\n"
-                output = `#{cmd_options['cmd']}`
-                output = output.split(separators['group'] + separators['result'])
-                output = output.collect { |r| r.split(separators['result']) }
-              end
-
-              cmd_options['groups'].each do |group|
-                if group['result']
-                  hash[cmd_type] << group['result']
-                else
-                  hash[cmd_type] << output.shift
-                  redis.set(
-                    group['cache_key'],
-                    Yajl::Encoder.encode(hash[cmd_type].last)
-                  )
-                  if group['ttl']
-                    redis.expire(group['cache_key'], group['ttl'])
+                    cmd_options['groups'].each do |group|
+                      unless group['result']
+                        redis.set(
+                          group['cache_key'],
+                          Yajl::Encoder.encode(output.shift)
+                        )
+                        if group['ttl']
+                          redis.expire(group['cache_key'], group['ttl'])
+                        end
+                      end
+                    end
                   end
                 end
               end
+            else
+              response = request.inject({}) do |hash, (cmd_type, cmd_options)|
+                hash[cmd_type] = []
 
-              hash
+                cmd_options['groups'].each do |group|
+                  hash[cmd_type] << group['result']
+                end
+
+                hash
+              end
             end
             
             redis.publish(
               "execache:response:#{channel}",
-              Yajl::Encoder.encode(response)
+              pending ? '[PENDING]' : Yajl::Encoder.encode(response)
             )
           end
         end

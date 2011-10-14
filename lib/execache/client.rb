@@ -9,18 +9,29 @@ class Execache
     end
 
     def exec(options)
-      options[:channel] = Digest::SHA1.hexdigest("#{rand}")
+      wait = options.delete(:wait)
+      subscribe_to = options[:channel] = Digest::SHA1.hexdigest("#{rand}")
+      options = Yajl::Encoder.encode(options)
       response = nil
 
       Timeout.timeout(60) do
-        @redis_1.subscribe("execache:response:#{options[:channel]}") do |on|
+        @redis_1.subscribe("execache:response:#{subscribe_to}") do |on|
           on.subscribe do |channel, subscriptions|
-            @redis_2.rpush "execache:request", Yajl::Encoder.encode(options)
+            @redis_2.rpush "execache:request", options
           end
 
           on.message do |channel, message|
-            response = Yajl::Parser.parse(message)
-            @redis_1.unsubscribe
+            if message.include?('[PENDING]')
+              if wait == false
+                response = false
+                @redis_1.unsubscribe
+              else  
+                @redis_2.rpush "execache:request", options
+              end
+            else
+              response = Yajl::Parser.parse(message)
+              @redis_1.unsubscribe
+            end
           end
         end
       end
