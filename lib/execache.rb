@@ -54,6 +54,7 @@ class Execache
                 else
                   pending = true
                   redis.set(cache_key, '[PENDING]')
+                  redis.expire(cache_key, 60) # Timeout incase execution fails
                   command << group['args']
                 end
               end
