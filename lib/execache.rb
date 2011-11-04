@@ -29,6 +29,7 @@ class Execache
           Timeout.timeout(60) do
             request = Yajl::Parser.parse(request)
             channel = request.delete('channel')
+            force = request.delete('channel')
             commands = []
             pending = false
 
@@ -49,7 +50,7 @@ class Execache
                 
                 if cache && cache == '[PENDING]'
                   pending = true
-                elsif cache
+                elsif !force && !group['force'] && cache
                   group['result'] = Yajl::Parser.parse(cache)
                 else
                   pending = true
