@@ -50,6 +50,7 @@ class Execache
                 
                 if cache && cache == '[PENDING]'
                   pending = true
+                  group['result'] = true
                 elsif !force && !group['force'] && cache
                   group['result'] = Yajl::Parser.parse(cache)
                 else
