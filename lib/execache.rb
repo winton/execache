@@ -42,8 +42,8 @@ class Execache
               
               # Fill results with caches if present
               cmd_options['groups'].each do |group|
-                cache_key = group['cache_key'] || Digest::SHA1.hexdigest(
-                  "#{cmd_options['args']} #{group['args']}"
+                cache_key = Digest::SHA1.hexdigest(
+                  "#{group['cache_key'] || cmd_options['args']} #{group['args']}"
                 )
                 group['cache_key'] = cache_key = "execache:cache:#{cache_key}"
                 cache = redis.get(cache_key)
