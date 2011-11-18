@@ -69,29 +69,34 @@ class Execache
 
             if pending
               # Execute command in thread, cache results
-              Thread.new do
-                Timeout.timeout(60) do
-                  request.each do |cmd_type, cmd_options|
-                    if cmd_options['cmd']
-                      separators = options[cmd_type]['separators'] || {}
-                      separators['group'] ||= "[END]"
-                      separators['result'] ||= "\n"
-                      output = `#{cmd_options['cmd']}`
-                      output = output.split(separators['group'] + separators['result'])
-                      output = output.collect { |r| r.split(separators['result']) }
-                    end
+              unless redis.get('execache:wait')
+                Thread.new do
+                  Timeout.timeout(60) do
+                    redis.set('execache:wait', '1')
+                    redis.expire('execache:wait', 120)
+                    request.each do |cmd_type, cmd_options|
+                      if cmd_options['cmd']
+                        separators = options[cmd_type]['separators'] || {}
+                        separators['group'] ||= "[END]"
+                        separators['result'] ||= "\n"
+                        output = `#{cmd_options['cmd']}`
+                        output = output.split(separators['group'] + separators['result'])
+                        output = output.collect { |r| r.split(separators['result']) }
+                      end
 
-                    cmd_options['groups'].each do |group|
-                      unless group['result']
-                        redis.set(
-                          group['cache_key'],
-                          Yajl::Encoder.encode(output.shift)
-                        )
-                        if group['ttl']
-                          redis.expire(group['cache_key'], group['ttl'])
+                      cmd_options['groups'].each do |group|
+                        unless group['result']
+                          redis.set(
+                            group['cache_key'],
+                            Yajl::Encoder.encode(output.shift)
+                          )
+                          if group['ttl']
+                            redis.expire(group['cache_key'], group['ttl'])
+                          end
                         end
                       end
                     end
+                    redis.del('execache:wait')
                   end
                 end
               end
