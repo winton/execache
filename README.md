@@ -32,6 +32,7 @@ Configure
 Given the above example, our `execache.yml` looks like this:
 
     redis: localhost:6379/0
+    parallel: 3
     some_binary:
       command: '/bin/some/binary'
       separators:
@@ -52,17 +53,12 @@ Execute Commands
     client = Execache::Client.new("localhost:6379/0")
     
     results = client.exec(
+      :ttl => 60,
       :some_binary => {
         :args => 'preliminary_arg',
         :groups => [
-          {
-            :args => 'arg1a arg1b',
-            :ttl => 60
-          },
-          {
-            :args => 'arg2a arg2b',
-            :ttl => 60
-          }
+          'arg1a arg1b',
+          'arg2a arg2b'
         ]
       }
     )

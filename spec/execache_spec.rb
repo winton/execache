@@ -5,17 +5,12 @@ describe Execache do
   def client_exec(options={})
     @client.exec(
       {
+        :ttl => 60,
         :some_binary => {
           :args => 'preliminary_arg',
           :groups => [
-            {
-              :args => 'arg1a arg1b',
-              :ttl => 60
-            },
-            {
-              :args => 'arg2a arg2b',
-              :ttl => 60
-            }
+            'arg1a arg1b',
+            'arg2a arg2b'
           ]
         }
       }.merge(options)
@@ -27,7 +22,7 @@ describe Execache do
       Execache.new("#{$root}/spec/fixtures/execache.yml")
     end
     @client = Execache::Client.new("localhost:6379/0")
-    @client.redis_1.keys("execache:cache:*").each do |key|
+    @client.redis_1.keys("execache:*").each do |key|
       @client.redis_1.del(key)
     end
   end
@@ -64,14 +59,10 @@ describe Execache do
 
   it "should read from cache for individual groups" do
     @client.exec(
+      :ttl => 60,
       :some_binary => {
         :args => 'preliminary_arg',
-        :groups => [
-          {
-            :args => 'arg2a arg2b',
-            :ttl => 60
-          }
-        ]
+        :groups => [ 'arg2a arg2b' ]
       }
     ).should == {
       "some_binary" => [
@@ -80,14 +71,10 @@ describe Execache do
     }
 
     @client.exec(
+      :ttl => 60,
       :some_binary => {
         :args => 'preliminary_arg',
-        :groups => [
-          {
-            :args => 'arg1a arg1b',
-            :ttl => 60
-          }
-        ]
+        :groups => [ 'arg1a arg1b' ]
       }
     ).should == {
       "some_binary" => [
@@ -98,14 +85,10 @@ describe Execache do
 
   it "should not read cache if preliminary arg changes" do
     @client.exec(
+      :ttl => 60,
       :some_binary => {
         :args => 'preliminary_arg2',
-        :groups => [
-          {
-            :args => 'arg2a arg2b',
-            :ttl => 60
-          }
-        ]
+        :groups => [ 'arg2a arg2b' ]
       }
     ).should == {
       "some_binary" => [
